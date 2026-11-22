@@ -1,0 +1,41 @@
+name: Teens Bots Cloud Watchdog & Sentinel
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Active Cloud Cluster
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          OWNER_ID: "8044818886"
+        run: |
+          echo "Checking active bots runner status..."
+          RUNS=$(curl -s -H "Authorization: Bearer $GH_PAT" \
+            "https://api.github.com/repos/spideyy7/teens-bots/actions/runs?status=in_progress")
+
+          ACTIVE_COUNT=$(echo "$RUNS" | grep -c '"status": "in_progress"' || true)
+          echo "Active running jobs found: $ACTIVE_COUNT"
+
+          if [ "$ACTIVE_COUNT" -eq 0 ]; then
+            echo "[!] No active runner found! Relaunching Teens Bots Cluster immediately..."
+
+            # Dispatch new runner
+            curl -X POST \
+              -H "Authorization: Bearer $GH_PAT" \
+              -H "Accept: application/vnd.github.v3+json" \
+              https://api.github.com/repos/spideyy7/teens-bots/actions/workflows/bots.yml/dispatches \
+              -d '{"ref":"main"}'
+
+            # Send Telegram Alert to Owner
+            ALERT_MSG="⚠️ *Teens Sentinel Notice:* Cloud runner was idle. Auto-healing triggered! All 4 bots are back online 🟢"
+            curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+              -d "chat_id=${OWNER_ID}&text=${ALERT_MSG}&parse_mode=Markdown"
+          else
+            echo "[✓] Cluster is healthy and running smoothly!"
+          fi
