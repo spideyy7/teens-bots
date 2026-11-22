@@ -1,0 +1,66 @@
+name: Teens 24/7 Bots Cloud Cluster
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */5 * * *'
+
+concurrency:
+  group: teens-bots-cloud
+  cancel-in-progress: true
+
+jobs:
+  run-bots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install System Audio Tools (ffmpeg)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg curl
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run All 4 Teens Bots in 24/7 Cloud Mode
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          STORAGE_CHAT_ID: ${{ secrets.STORAGE_CHAT_ID }}
+          PORT: 8000
+        run: |
+          echo "Starting Teens Bots Unified Cloud Engine..."
+          python -u run_render.py &
+          BOT_PID=$!
+          echo "Bots running with PID $BOT_PID"
+
+          # Health check verification
+          sleep 10
+          curl -s http://localhost:8000/health || echo "Health check pinged"
+
+          # Keep running for 5 hours and 40 minutes (20400 seconds)
+          echo "Bots active and serving 24/7..."
+          sleep 20400
+
+          # Auto re-trigger next cycle before current 6h limit
+          echo "Triggering next 24/7 runner cycle..."
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/spideyy7/teens-bots/actions/workflows/bots.yml/dispatches \
+            -d '{"ref":"main"}'
+
+          sleep 30
+          kill $BOT_PID || true
+          echo "Cycle handover complete."
