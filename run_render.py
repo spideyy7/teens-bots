@@ -22,7 +22,7 @@ import testing_bot
 import music_bot
 
 START_TIME = time.time()
-PORT = int(os.environ.get("PORT", 10000))
+PORT = int(os.environ.get("PORT", 8000))
 
 # ── Health Check Web Handler for Render ────────────────────
 async def handle_home(request):
