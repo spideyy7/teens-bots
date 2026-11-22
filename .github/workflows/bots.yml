@@ -3,7 +3,7 @@ name: Teens 24/7 Bots Cloud Cluster
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */5 * * *'
+    - cron: '0 */4 * * *'
 
 concurrency:
   group: teens-bots-cloud
@@ -49,9 +49,9 @@ jobs:
           sleep 10
           curl -s http://localhost:8000/health || echo "Health check pinged"
 
-          # Keep running for 5 hours and 40 minutes (20400 seconds)
+          # Keep running for 4 hours and 45 minutes (17100 seconds)
           echo "Bots active and serving 24/7..."
-          sleep 20400
+          sleep 17100
 
           # Auto re-trigger next cycle before current 6h limit
           echo "Triggering next 24/7 runner cycle..."
