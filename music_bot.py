@@ -43,8 +43,8 @@ from yt_dlp import YoutubeDL
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
-BOT_TOKEN = os.environ["BOT_TOKEN"]
-STORAGE_CHAT_ID = int(os.environ["STORAGE_CHAT_ID"])  # private channel/group where the bot is admin
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "9075299775:AAHn0hotK_opSCXB-UKO6-G7dxkv8J3OwGg")
+STORAGE_CHAT_ID = int(os.environ.get("STORAGE_CHAT_ID", "-1004422447055"))  # private channel/group where the bot is admin
 ACR_HOST = os.getenv("ACR_HOST", "")                  # e.g. identify-eu-west-1.acrcloud.com
 ACR_KEY = os.getenv("ACR_ACCESS_KEY", "")
 ACR_SECRET = os.getenv("ACR_ACCESS_SECRET", "")
