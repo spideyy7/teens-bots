@@ -384,6 +384,17 @@ async def handle_callback(event):
         user_data_cache.pop(sender_id, None)
         await event.answer("🎉 Verification Complete! You can now chat in the group.", alert=True)
 
+        # Post welcoming notification directly into General Chat (Topic 3) so everyone sees them switch!
+        try:
+            await bot.send_message(
+                GROUP_ID,
+                f"🎉 **Welcome [{sender.first_name}](tg://user?id={sender_id}) to 💬 General Chat!** 🫶\n"
+                f"✨ Verification complete! Everyone give them a warm welcome! 👋",
+                reply_to=GENERAL_CHAT_TOPIC_ID
+            )
+        except Exception as e:
+            print(f"[!] Error welcoming user to General Chat: {e}")
+
         # Automatically advance queue and delete card after 15 seconds to keep Topic clean
         async def auto_finish(card):
             global active_user
