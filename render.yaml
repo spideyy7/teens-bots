@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: teens-bots-suite
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: frankfurt
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: BOT_TOKEN
+        sync: false
+      - key: STORAGE_CHAT_ID
+        sync: false
