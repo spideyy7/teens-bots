@@ -43,8 +43,8 @@ from yt_dlp import YoutubeDL
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "9075299775:AAHn0hotK_opSCXB-UKO6-G7dxkv8J3OwGg")
-STORAGE_CHAT_ID = int(os.environ.get("STORAGE_CHAT_ID", "-1004422447055"))  # private channel/group where the bot is admin
+BOT_TOKEN = os.environ["BOT_TOKEN"]
+STORAGE_CHAT_ID = int(os.environ["STORAGE_CHAT_ID"])  # private channel/group where the bot is admin
 ACR_HOST = os.getenv("ACR_HOST", "")                  # e.g. identify-eu-west-1.acrcloud.com
 ACR_KEY = os.getenv("ACR_ACCESS_KEY", "")
 ACR_SECRET = os.getenv("ACR_ACCESS_SECRET", "")
@@ -208,9 +208,13 @@ async def on_inline(q: InlineQuery, bot: Bot):
         else:
             results.append(InlineQueryResultArticle(
                 id=s["id"], title=s["title"], description=desc, thumbnail_url=thumb(s["id"]),
-                input_message_content=InputTextMessageContent(message_text=f"🎧 <b>{s['title']}</b>\n{s['artist']}\n\n⏳ Preparing…", parse_mode="HTML"),
-                # a button is REQUIRED so Telegram gives us inline_message_id to edit later
-                reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⏳ loading…", callback_data="noop")]]),
+                input_message_content=InputTextMessageContent(
+                    message_text=f"🎧 <b>{s['title']}</b>\n{s['artist']} • {fmt_dur(s['dur'])}\n\n▶️ <i>Tap below to receive song audio:</i>",
+                    parse_mode="HTML"
+                ),
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+                    InlineKeyboardButton(text="🎵 Play / Get Song", url=f"https://t.me/teenmusicbot?start=p_{s['id']}")
+                ]]),
             ))
     await q.answer(results, cache_time=5, is_personal=False)
 
@@ -232,20 +236,12 @@ async def on_inline(q: InlineQuery, bot: Bot):
 
 @router.chosen_inline_result()
 async def on_chosen(c: ChosenInlineResult, bot: Bot):
-    if not c.inline_message_id:
-        return  # cached audio result: already delivered
     song = await song_from_id(c.result_id)
-    if not song:
-        return
-    try:
-        fid = await get_file_id(bot, song)
-        await bot.edit_message_media(
-            InputMediaAudio(media=fid, title=song["title"], performer=song["artist"], duration=song["dur"]),
-            inline_message_id=c.inline_message_id,
-        )
-    except Exception as e:
-        log.exception("deliver failed")
-        await bot.edit_message_text("❌ Couldn't load this song, try another.", inline_message_id=c.inline_message_id)
+    if song:
+        try:
+            await get_file_id(bot, song)
+        except Exception as e:
+            log.warning("Warm caching failed for chosen song: %s", e)
 
 
 @router.callback_query(F.data == "noop")
@@ -264,6 +260,23 @@ def results_keyboard(songs: list[dict]) -> InlineKeyboardMarkup:
 
 @router.message(CommandStart())
 async def start(m: Message, bot: Bot):
+    args = m.text.split(maxsplit=1)
+    if len(args) > 1 and args[1].startswith("p_"):
+        vid = args[1][2:]
+        song = await song_from_id(vid)
+        if song:
+            wait_msg = await m.answer(f"⚡ Loading <b>{song['title']}</b>...", parse_mode="HTML")
+            try:
+                fid = await get_file_id(bot, song)
+                await m.answer_audio(fid, title=song["title"], performer=song["artist"], duration=song["dur"])
+                try:
+                    await wait_msg.delete()
+                except Exception:
+                    pass
+            except Exception as e:
+                await wait_msg.edit_text(f"❌ Could not deliver song: {e}")
+            return
+
     me = await bot.get_me()
     await m.answer(
         "🎵 <b>Music Bot</b>\n\n"
@@ -287,14 +300,22 @@ async def play_cmd(m: Message, bot: Bot):
 @router.callback_query(F.data.startswith("p:"))
 async def pick(c: CallbackQuery, bot: Bot):
     vid = c.data[2:]
-    await c.answer("⚡ Sending…")
+    await c.answer("⚡ Sending song…")
     song = await song_from_id(vid)
     if not song:
         return
     fid = await get_file_id(bot, song)
-    await bot.send_audio(c.message.chat.id, fid, title=song["title"], performer=song["artist"],
-                         duration=song["dur"], reply_to_message_id=c.message.reply_to_message.message_id
-                         if c.message.reply_to_message else None)
+    thread_id = getattr(c.message, "message_thread_id", None)
+    rep_id = c.message.reply_to_message.message_id if c.message.reply_to_message else c.message.message_id
+    await bot.send_audio(
+        chat_id=c.message.chat.id,
+        audio=fid,
+        title=song["title"],
+        performer=song["artist"],
+        duration=song["dur"],
+        message_thread_id=thread_id,
+        reply_to_message_id=rep_id
+    )
 
 
 # ───────────────────────────── voice / humming recognition ─────────────────────────────
