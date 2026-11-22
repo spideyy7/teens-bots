@@ -127,6 +127,12 @@ def _download_sync(vid: str) -> str:
         "noplaylist": True,
         "max_filesize": 48 * 1024 * 1024,
         "concurrent_fragment_downloads": 4,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["tv", "web_embedded", "android", "ios"],
+                "player_skip": ["webpage"]
+            }
+        }
     }
     with YoutubeDL(opts) as y:
         info = y.extract_info(f"https://music.youtube.com/watch?v={vid}", download=True)
@@ -304,18 +310,28 @@ async def pick(c: CallbackQuery, bot: Bot):
     song = await song_from_id(vid)
     if not song:
         return
-    fid = await get_file_id(bot, song)
     thread_id = getattr(c.message, "message_thread_id", None)
     rep_id = c.message.reply_to_message.message_id if c.message.reply_to_message else c.message.message_id
-    await bot.send_audio(
-        chat_id=c.message.chat.id,
-        audio=fid,
-        title=song["title"],
-        performer=song["artist"],
-        duration=song["dur"],
-        message_thread_id=thread_id,
-        reply_to_message_id=rep_id
-    )
+    try:
+        fid = await get_file_id(bot, song)
+        await bot.send_audio(
+            chat_id=c.message.chat.id,
+            audio=fid,
+            title=song["title"],
+            performer=song["artist"],
+            duration=song["dur"],
+            message_thread_id=thread_id,
+            reply_to_message_id=rep_id
+        )
+    except Exception as e:
+        log.exception("Error delivering song: %s", e)
+        await bot.send_message(
+            chat_id=c.message.chat.id,
+            text=f"❌ <b>Could not download song:</b> {e}",
+            message_thread_id=thread_id,
+            reply_to_message_id=rep_id,
+            parse_mode="HTML"
+        )
 
 
 # ───────────────────────────── voice / humming recognition ─────────────────────────────
