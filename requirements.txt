@@ -1,0 +1,10 @@
+aiogram>=3.13.0
+telethon>=1.36.0
+yt-dlp
+ytmusicapi
+python-dotenv
+aiohttp
+shazamio
+SpeechRecognition
+pillow
+gunicorn
